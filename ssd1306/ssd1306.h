@@ -15,84 +15,109 @@
 #include <errno.h>
 #include <fonts/fonts.h>
 
-#include <driver/i2c.h>
+#include <i2cdev.h>
 
-#define SSD1306_I2C_ADDR_0    (0x3C)
-#define SSD1306_I2C_ADDR_1    (0x3D)
+#define SSD1306_I2C_ADDR_LO    (0x3C)
+#define SSD1306_I2C_ADDR_HI    (0x3D)
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 /**
  * SH1106 pump voltage value
  */
-typedef enum
-{
-    SH1106_VOLTAGE_74 = 0, // 7.4 Volt
-    SH1106_VOLTAGE_80,     // 8.0 Volt
-    SH1106_VOLTAGE_84,     // 8.4 Volt
-    SH1106_VOLTAGE_90      // 9.0 Volt
+typedef enum {
+	SH1106_VOLTAGE_74 = 0, // 7.4 Volt
+	SH1106_VOLTAGE_80,     // 8.0 Volt
+	SH1106_VOLTAGE_84,     // 8.4 Volt
+	SH1106_VOLTAGE_90      // 9.0 Volt
 } sh1106_voltage_t;
 
 /**
  * Screen type
  */
-typedef enum
-{
-    SSD1306_SCREEN = 0,
-    SH1106_SCREEN
+typedef enum {
+	SSD1306_SCREEN = 0, SH1106_SCREEN
 } ssd1306_screen_t;
 
 /**
  * Device descriptor
  */
-typedef struct
-{
-    i2c_port_t i2c_port;     //!< i2c port (bus) number
-    uint8_t i2c_addr;        //!< ssd1306 device address
-    ssd1306_screen_t screen;
-    uint8_t width;           //!< Screen width, currently supported 128px, 96px
-    uint8_t height;          //!< Screen height, currently supported 16px, 32px, 64px
+typedef struct {
+	ssd1306_screen_t screen;
+	uint8_t width;           //!< Screen width, currently supported 128px, 96px
+	uint8_t height;     //!< Screen height, currently supported 16px, 32px, 64px
+	i2c_dev_t i2c_dev;
+
 } ssd1306_t;
 
 /**
  * Addressing mode, see datasheet
  */
-typedef enum
-{
-    SSD1306_ADDR_MODE_HORIZONTAL = 0,
-    SSD1306_ADDR_MODE_VERTICAL,
-    SSD1306_ADDR_MODE_PAGE
+typedef enum {
+	SSD1306_ADDR_MODE_HORIZONTAL = 0,
+	SSD1306_ADDR_MODE_VERTICAL,
+	SSD1306_ADDR_MODE_PAGE
 } ssd1306_mem_addr_mode_t;
 
 /**
  * Drawing color
  */
-typedef enum
-{
-    OLED_COLOR_TRANSPARENT = -1, //!< Transparent (not drawing)
-    OLED_COLOR_BLACK = 0,        //!< Black (pixel off)
-    OLED_COLOR_WHITE = 1,        //!< White (or blue, yellow, pixel on)
-    OLED_COLOR_INVERT = 2,       //!< Invert pixel (XOR)
+typedef enum {
+	OLED_COLOR_TRANSPARENT = -1, //!< Transparent (not drawing)
+	OLED_COLOR_BLACK = 0,        //!< Black (pixel off)
+	OLED_COLOR_WHITE = 1,        //!< White (or blue, yellow, pixel on)
+	OLED_COLOR_INVERT = 2,       //!< Invert pixel (XOR)
 } ssd1306_color_t;
 
 /**
  * Scrolling time frame interval
  */
-typedef enum
-{
-    FRAME_5 = 0,
-    FRAME_64,
-    FRAME_128,
-    FRAME_256,
-    FRAME_3,
-    FRAME_4,
-    FRAME_25,
-    FRAME_2
+typedef enum {
+	FRAME_5 = 0,
+	FRAME_64,
+	FRAME_128,
+	FRAME_256,
+	FRAME_3,
+	FRAME_4,
+	FRAME_25,
+	FRAME_2
 
 } ssd1306_scroll_t;
+
+/**
+ * Attach to I2C port.
+ * @fn esp_err_t ssd1306_init_desc(ssd1306_t*, uint8_t, i2c_port_t, gpio_num_t, gpio_num_t)
+ * @param dev Pointer to device descriptor
+ * @param addr I2C address.
+ * @param port I2C port.
+ * @param sda_gpio I2C SDA gpio number.
+ * @param scl_gpio I2C SCL gpio number.
+ * @return
+ */
+esp_err_t ssd1306_init_desc(ssd1306_t *dev, uint8_t addr, i2c_port_t port,
+		gpio_num_t sda_gpio, gpio_num_t scl_gpio);
+
+/**
+ * Leave I2C port.
+ * @fn esp_err_t ssd1306free_desc(ssd1306_t*)
+ * @param dev Pointer to device descriptor
+ * @return
+ */
+esp_err_t ssd1306free_desc(ssd1306_t *dev);
+
+/**
+ * Some additional settings.
+ * @fn esp_err_t ssd1306_setup(ssd1306_t*, ssd1306_screen_t, uint8_t, uint8_t)
+ * @param dev Pointer to device descriptor
+ * @param screen Type of display driver.
+ * @param width Width in pixels.
+ * @param height Height in pixels.
+ * @return
+ */
+esp_err_t ssd1306_setup(ssd1306_t *dev, ssd1306_screen_t screen, uint8_t width,
+		uint8_t height);
 
 /**
  * Issue a single command on SSD1306.
@@ -131,9 +156,8 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[]);
  * @param dev Pointer to device descriptor
  * @return Non-zero if error occurred
  */
-inline int ssd1306_clear_screen(const ssd1306_t *dev)
-{
-    return ssd1306_load_frame_buffer(dev, NULL);
+inline int ssd1306_clear_screen(const ssd1306_t *dev) {
+	return ssd1306_load_frame_buffer(dev, NULL);
 }
 
 /**
@@ -169,7 +193,8 @@ int ssd1306_set_display_offset(const ssd1306_t *dev, uint8_t offset);
  * @param select Select charge pump voltage value
  * @return Non-zero if error occurred
  */
-int sh1106_set_charge_pump_voltage(const ssd1306_t *dev, sh1106_voltage_t select);
+int sh1106_set_charge_pump_voltage(const ssd1306_t *dev,
+		sh1106_voltage_t select);
 
 /**
  * Enable or disable the charge pump. See application note in datasheet.
@@ -185,7 +210,8 @@ int ssd1306_set_charge_pump_enabled(const ssd1306_t *dev, bool enabled);
  * @param mode Addressing mode
  * @return Non-zero if error occurred
  */
-int ssd1306_set_mem_addr_mode(const ssd1306_t *dev, ssd1306_mem_addr_mode_t mode);
+int ssd1306_set_mem_addr_mode(const ssd1306_t *dev,
+		ssd1306_mem_addr_mode_t mode);
 
 /**
  * Change the mapping between the display data column address and the
@@ -323,7 +349,8 @@ int ssd1306_set_whole_display_lighting(const ssd1306_t *dev, bool light);
  * @param color Color of the pixel
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_pixel(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, ssd1306_color_t color);
+int ssd1306_draw_pixel(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y,
+		ssd1306_color_t color);
 
 /**
  * Draw a horizontal line
@@ -335,7 +362,8 @@ int ssd1306_draw_pixel(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, ss
  * @param color Color of the line
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_hline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, uint8_t w, ssd1306_color_t color);
+int ssd1306_draw_hline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y,
+		uint8_t w, ssd1306_color_t color);
 
 /**
  * Draw a vertical line
@@ -347,7 +375,8 @@ int ssd1306_draw_hline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, ui
  * @param color Color of the line
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_vline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, uint8_t h, ssd1306_color_t color);
+int ssd1306_draw_vline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y,
+		uint8_t h, ssd1306_color_t color);
 
 /**
  * Draw a line
@@ -360,7 +389,8 @@ int ssd1306_draw_vline(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, ui
  * @param color Color of the line
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_line(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t y0, int16_t x1, int16_t y1, ssd1306_color_t color);
+int ssd1306_draw_line(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t y0,
+		int16_t x1, int16_t y1, ssd1306_color_t color);
 
 /**
  * Draw a rectangle
@@ -373,7 +403,8 @@ int ssd1306_draw_line(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t y0,
  * @param color Color of the rectangle border
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, uint8_t w, uint8_t h, ssd1306_color_t color);
+int ssd1306_draw_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x,
+		int8_t y, uint8_t w, uint8_t h, ssd1306_color_t color);
 
 /**
  * Draw a filled rectangle
@@ -386,7 +417,8 @@ int ssd1306_draw_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y
  * @param color Color of the rectangle
  * @return Non-zero if error occurred
  */
-int ssd1306_fill_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y, uint8_t w, uint8_t h, ssd1306_color_t color);
+int ssd1306_fill_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x,
+		int8_t y, uint8_t w, uint8_t h, ssd1306_color_t color);
 
 /**
  * Draw a circle
@@ -398,7 +430,8 @@ int ssd1306_fill_rectangle(const ssd1306_t *dev, uint8_t *fb, int8_t x, int8_t y
  * @param color Color of the circle border
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0, uint8_t r, ssd1306_color_t color);
+int ssd1306_draw_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0,
+		uint8_t r, ssd1306_color_t color);
 
 /**
  * Draw a filled circle
@@ -410,7 +443,8 @@ int ssd1306_draw_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0,
  * @param color Color of the circle
  * @return Non-zero if error occurred
  */
-int ssd1306_fill_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0, uint8_t r, ssd1306_color_t color);
+int ssd1306_fill_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0,
+		uint8_t r, ssd1306_color_t color);
 
 /**
  * Draw a triangle
@@ -425,7 +459,9 @@ int ssd1306_fill_circle(const ssd1306_t *dev, uint8_t *fb, int8_t x0, int8_t y0,
  * @param color Color of the triangle border
  * @return Non-zero if error occurred
  */
-int ssd1306_draw_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, ssd1306_color_t color);
+int ssd1306_draw_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0,
+		int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+		ssd1306_color_t color);
 
 /**
  * Draw a filled triangle
@@ -440,7 +476,9 @@ int ssd1306_draw_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t
  * @param color Color of the triangle
  * @return Non-zero if error occurred
  */
-int ssd1306_fill_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, ssd1306_color_t color);
+int ssd1306_fill_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0,
+		int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+		ssd1306_color_t color);
 
 /**
  * Draw one character using currently selected font
@@ -454,7 +492,9 @@ int ssd1306_fill_triangle(const ssd1306_t *dev, uint8_t *fb, int16_t x0, int16_t
  * @param background Background color
  * @return Width of the character or negative value if error occurred
  */
-int ssd1306_draw_char(const ssd1306_t *dev, uint8_t *fb, const font_info_t *font, uint8_t x, uint8_t y, char c, ssd1306_color_t foreground, ssd1306_color_t background);
+int ssd1306_draw_char(const ssd1306_t *dev, uint8_t *fb,
+		const font_info_t *font, uint8_t x, uint8_t y, char c,
+		ssd1306_color_t foreground, ssd1306_color_t background);
 
 /**
  * Draw one character using currently selected font
@@ -468,7 +508,9 @@ int ssd1306_draw_char(const ssd1306_t *dev, uint8_t *fb, const font_info_t *font
  * @param background Background color
  * @return Width of the string  or negative value if error occurred
  */
-int ssd1306_draw_string(const ssd1306_t *dev, uint8_t *fb, const font_info_t *font, uint8_t x, uint8_t y, const char *str, ssd1306_color_t foreground, ssd1306_color_t background);
+int ssd1306_draw_string(const ssd1306_t *dev, uint8_t *fb,
+		const font_info_t *font, uint8_t x, uint8_t y, const char *str,
+		ssd1306_color_t foreground, ssd1306_color_t background);
 
 /**
  * Stop scrolling (the ram data needs to be rewritten)
@@ -486,7 +528,8 @@ int ssd1306_stop_scroll(const ssd1306_t *dev);
  * @param frame Time interval between each scroll
  * @return Non-zero if error occurred
  */
-int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uint8_t stop, ssd1306_scroll_t frame);
+int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start,
+		uint8_t stop, ssd1306_scroll_t frame);
 
 /**
  * Start horizontal+vertical scrolling (cant vertical scrolling)
@@ -498,7 +541,8 @@ int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uin
  * @param frame Time interval between each scroll
  * @return Non-zero if error occurred
  */
-int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start, uint8_t stop, uint8_t dy, ssd1306_scroll_t frame);
+int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way,
+		uint8_t start, uint8_t stop, uint8_t dy, ssd1306_scroll_t frame);
 
 #ifdef __cplusplus
 }
